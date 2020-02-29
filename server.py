@@ -1,47 +1,53 @@
 from flask import Flask, jsonify, request
-# from flask_cors import CORS
+from flask_cors import CORS
+from joblib import dump, load
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 
 app = Flask(__name__)
-# cors = CORS(app, resources={"/", {"Access-Control-Allow-Origin": "*"}})
+CORS(app)
 
-# Sample Data
-X = np.array([15, 25, 36, 26, 80, 14, 15, 43, 51, 36, 38, 22, 60, 65, 73, 45, 15, 77, 94, 83, 51, 55, 65, 55]).reshape(-1, 1)
-y = np.array([1] * 12 + [0] * 12)
+CLASSIFIER_FILE_NAME = "classifier.joblib"
 
-DEFAULT_PROBABILITY = 0.3
-
-# https://scikit-learn.org/stable/modules/model_persistence.html -> saving model
-classifier = LogisticRegression(random_state=0, multi_class="ovr")
-# classifier.fit(X, y)
-
-def response(val=DEFAULT_PROBABILITY):
-    return jsonify({"result": val})
+# Initialize model
+dump(LogisticRegression(multi_class="ovr", random_state=0, solver="lbfgs"), CLASSIFIER_FILE_NAME)
 
 @app.route("/train", methods=["POST"])
 def train():
-    # get X and y data from post method
-    data = request.form
-    print(data.x, data.y)
+    # get data from post method
+    data = request.get_json()
+
+    # Load classifier
+    classifier = load(CLASSIFIER_FILE_NAME)
 
     # fit the model
-    classifier.fit(X, y)
+    x = np.array(data["x"]).reshape(-1, 1)
+    y = np.array(data["y"])
+    classifier.fit(x, y)
+
+    # Re-store the model
+    dump(classifier, CLASSIFIER_FILE_NAME)
+
+    return jsonify({}), 200
 
 @app.route("/classify/<string:distance>", methods=["GET"])
 def classify(distance):
     try:
         distance = float(distance)
     except Exception:
-        # Some garbage was passed in
-        return response()
+        # Some garbage was passed to the distance parameter
+        return jsonify({}), 500
 
     try:
-        _, accept_chance = classifier.predict_proba(np.array([15]).reshape(-1, 1))[0]
-        return response(accept_chance)
+        # Load classifier
+        classifier = load(CLASSIFIER_FILE_NAME)
+
+        # Make prediction
+        _, accept_chance = classifier.predict_proba(np.array([distance]).reshape(-1, 1))[0]
+        return jsonify({"result": accept_chance}), 200
     except Exception:
         # The model wasn't fitted first somehow
-        return response()
+        return jsonify({}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=False)
