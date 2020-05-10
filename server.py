@@ -14,7 +14,7 @@ dump(LogisticRegression(multi_class="ovr", random_state=0, solver="lbfgs"), CLAS
 
 @app.route("/train", methods=["POST"])
 def train():
-    # get data from post method
+    # Get data from post method
     data = request.get_json()
 
     # Load classifier
@@ -28,6 +28,7 @@ def train():
     # Re-store the model
     dump(classifier, CLASSIFIER_FILE_NAME)
 
+    # Return an empty response
     return jsonify({}), 200
 
 @app.route("/classify/<string:distance>", methods=["GET"])
